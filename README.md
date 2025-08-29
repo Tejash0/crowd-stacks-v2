@@ -1,63 +1,67 @@
-CrowdStacks – Decentralized Crowdfunding on Stacks
+CrowdStacks: The Story
+CrowdStacks was created to solve a major problem in indie game crowdfunding: a lack of trust. Many campaigns fail to deliver a finished game, leaving backers with nothing to show for their support. Our platform solves this by ensuring accountability through the use of smart contracts.
 
-A milestone-based crowdfunding platform built on the Stacks blockchain. Campaign funds are escrowed in smart contracts and released only when goals are met, ensuring accountability for backers and creators.
+How it Works: Funds are held in escrow on the Stacks blockchain and are only released to developers when they hit pre-defined milestones.
+
+For Backers: This model gives you more security. Your contribution is protected and won't be used until a developer shows concrete progress.
+
+For Developers: This allows you to build trust with the community and demonstrate you are committed to the project.
+
+The Platform
+CrowdStacks is built on the Stacks blockchain, providing a secure and transparent system.
 
 Quick Start
-Prerequisites
+You'll need a few things to get started:
 
 Node.js 18+
 
 Docker Desktop
 
-Clarinet CLI (npm install -g @hirosystems/clarinet)
+Clarinet CLI (install with npm install -g @hirosystems/clarinet)
 
 Installation
-# Install dependencies
-npm install
+Install dependencies: npm install
 
-# Start local Clarinet devnet
-cd contracts && clarinet integrate
+Start the local devnet: cd contracts && clarinet integrate
 
-# Launch frontend (in a new terminal)
-npm run dev
+Launch the frontend: npm run dev (in a new terminal)
 
-
-Visit http://localhost:3000
- to access the DApp.
+Access the DApp at http://localhost:3000.
 
 Testing
-npm test
+You can run automated tests or use the console to interact with the smart contracts.
 
-# or directly in Clarinet console
-cd contracts && clarinet console
-(contract-call? .crowdfunding contribute u5000000)
+Run tests: npm test
+
+Use the console:
+
+Open the console: cd contracts && clarinet console
+
+Call a function: (contract-call? .crowdfunding contribute u5000000)
 
 Project Structure
+/contracts/: Clarity smart contracts and tests.
 
-/contracts/ – Clarity smart contracts and tests
+/app/: The Next.js frontend application.
 
-/app/ – Next.js frontend application
+/components/: Reusable UI components.
 
-/components/ – Reusable UI components
+/lib/: Blockchain helpers and configuration.
 
-/lib/ – Blockchain helpers and config
-
-/public/ – Static assets
+/public/: Static assets.
 
 Demo Workflow
+Start the local blockchain with Clarinet.
 
-Start local blockchain with Clarinet
+Launch the frontend.
 
-Launch frontend (npm run dev)
+Create a new campaign.
 
-Create a campaign
+Contribute STX to the campaign.
 
-Contribute STX to campaign
+Wait for the milestone goal to be met.
 
-Confetti triggers when goal is reached
-
-Withdraw funds (if successful) or request refund
+Withdraw funds (if successful) or request a refund.
 
 Documentation
-
-See ABOUT.md for technical architecture and implementation details.
+For technical architecture and implementation details, see ABOUT.md.

@@ -22,6 +22,7 @@ import {
   uintCV,
   AnchorMode
 } from '@stacks/transactions'
+import { PostConditionMode, FungibleConditionCode, makeContractSTXPostCondition } from '@stacks/transactions'
 import { StacksTestnet } from '@stacks/network'
 import { UserSession, AppConfig, showConnect, openContractCall } from '@stacks/connect'
 
@@ -44,6 +45,9 @@ interface Campaign {
   deadline: number
   owner: string
   active: boolean
+  successful?: boolean
+  withdrawn?: boolean
+  finalized?: boolean
 }
 
 interface GlobalStats {
@@ -69,6 +73,9 @@ const parseCampaign = (json: any, id: number): Campaign => {
     deadline: jNum(d.deadline),
     owner: d.owner?.value || '',
     active: jBool(d.active),
+    successful: jBool(d.successful),
+    withdrawn: jBool(d.withdrawn),
+    finalized: jBool(d.finalized),
   }
 }
 
@@ -261,12 +268,28 @@ export default function AdminPage() {
     setClosingCampaign(campaignId);
 
     try {
+      // Build post-conditions for withdraw to prevent wallet rollback
+      const isWithdraw = functionName === 'withdraw-funds'
+      const withdrawAmountMicro = isWithdraw ? Math.max(0, Math.round(campaign.total * 1_000_000)) : 0
+      const postConditions = isWithdraw
+        ? [
+            makeContractSTXPostCondition(
+              CONTRACT_ADDRESS,
+              CONTRACT_NAME,
+              FungibleConditionCode.LessEqual,
+              withdrawAmountMicro.toString()
+            ),
+          ]
+        : []
+
       await openContractCall({
         network,
         contractAddress: CONTRACT_ADDRESS,
         contractName: CONTRACT_NAME,
         functionName: functionName, // <-- Use the correct function name
         functionArgs: [uintCV(campaignId)],
+        postConditionMode: isWithdraw ? PostConditionMode.Allow : undefined,
+        postConditions,
         anchorMode: AnchorMode.Any,
         onFinish: async (data) => {
           alert(`Transaction broadcasted! Waiting for confirmation...`);
@@ -423,14 +446,25 @@ export default function AdminPage() {
                           </div>
 
                           {campaign.active && (
-                            <button
-                              onClick={() => handleCloseCampaign(campaign.id)}
-                              disabled={isClosing}
-                              className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors"
-                            >
-                              <X size={14} />
-                              <span>{isClosing ? 'Closing...' : 'Close'}</span>
-                            </button>
+                            campaign.successful && !campaign.withdrawn ? (
+                              <button
+                                onClick={() => handleCloseCampaign(campaign.id)}
+                                disabled={isClosing}
+                                className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors"
+                              >
+                                <Wallet size={14} />
+                                <span>{isClosing ? 'Withdrawing...' : 'Withdraw Funds'}</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleCloseCampaign(campaign.id)}
+                                disabled={isClosing}
+                                className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors"
+                              >
+                                <X size={14} />
+                                <span>{isClosing ? 'Closing...' : 'Close'}</span>
+                              </button>
+                            )
                           )}
                         </div>
 

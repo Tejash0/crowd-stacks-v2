@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -60,15 +60,15 @@ interface GlobalStats {
 
 // Helper functions for parsing Clarity values
 const jNum = (cv: any) => Number(cv?.value ?? 0)
-const jStr = (cv: any) => String(cv?.value ?? '')
+const jStr = (cv: any) => String(cv?.value ?? "")
 const jBool = (cv: any) => Boolean(cv?.value ?? false)
 
 const parseCampaign = (json: any, id: number): Campaign => {
   const d = json?.value?.value ?? {}
   return {
     id,
-    title: jStr(d.title) || `Campaign ${id}`,
-    description: jStr(d.description) || `Campaign ${id}`,
+    title: jStr(d.title) || 'Campaign ${id}',
+    description: jStr(d.description) || 'Campaign ${id}',
     goal: jNum(d.goal) / 1_000_000,
     total: jNum(d.total) / 1_000_000,
     deadline: jNum(d.deadline),
@@ -150,10 +150,10 @@ export default function AdminPage() {
   const handleConnect = () => {
     showConnect({
       appDetails: {
-        name: 'CrowdStacks - Admin Dashboard',
-        icon: window.location.origin + '/favicon.ico',
+        name: "CrowdStacks - Admin Dashboard",
+        icon: window.location.origin + "/favicon.ico",
       },
-      redirectTo: '/admin',
+      redirectTo: "/admin",
       userSession,
       onFinish: () => {
         window.location.reload()
@@ -171,7 +171,7 @@ export default function AdminPage() {
         callReadOnlyFunction({
           contractAddress: CONTRACT_ADDRESS,
           contractName: CONTRACT_NAME,
-          functionName: 'get-total-stx',
+          functionName: "get-total-stx",
           functionArgs: [],
           network,
           senderAddress: CONTRACT_ADDRESS,
@@ -179,7 +179,7 @@ export default function AdminPage() {
         callReadOnlyFunction({
           contractAddress: CONTRACT_ADDRESS,
           contractName: CONTRACT_NAME,
-          functionName: 'get-total-contributors',
+          functionName: "get-total-contributors",
           functionArgs: [],
           network,
           senderAddress: CONTRACT_ADDRESS,
@@ -187,7 +187,7 @@ export default function AdminPage() {
         callReadOnlyFunction({
           contractAddress: CONTRACT_ADDRESS,
           contractName: CONTRACT_NAME,
-          functionName: 'get-active-campaigns',
+          functionName: "get-active-campaigns",
           functionArgs: [],
           network,
           senderAddress: CONTRACT_ADDRESS,
@@ -195,11 +195,11 @@ export default function AdminPage() {
         callReadOnlyFunction({
           contractAddress: CONTRACT_ADDRESS,
           contractName: CONTRACT_NAME,
-          functionName: 'get-campaign-count',
+          functionName: "get-campaign-count",
           functionArgs: [],
           network,
           senderAddress: CONTRACT_ADDRESS,
-        })
+        }),
       ])
 
       // Update global stats
@@ -303,10 +303,10 @@ export default function AdminPage() {
 
     // 4. Show the correct message and stop if the user cancels
     if (!confirm(confirmationMessage)) {
-      return;
+      return
     }
 
-    setClosingCampaign(campaignId);
+    setClosingCampaign(campaignId)
 
     try {
       // Build post-conditions for withdraw to prevent wallet rollback
@@ -366,32 +366,35 @@ export default function AdminPage() {
   const otherCampaigns = user ? campaigns.filter(c => c.owner !== user.profile.stxAddress.testnet) : []
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-black via-neutral-950 to-black text-neutral-100">
       {/* Navigation */}
-      <nav className="backdrop-blur-md bg-white/10 border-b border-white/20">
+      <nav className="backdrop-blur-md bg-neutral-800/50 border-b border-violet-300/30">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center space-x-2 text-white hover:text-blue-400 transition-colors">
+            <Link
+              href="/"
+              className="flex items-center space-x-2 text-neutral-100 hover:text-violet-400 transition-colors"
+            >
               <ArrowLeft size={20} />
               <span>Back to Home</span>
             </Link>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <Settings className="h-6 w-6 text-purple-400" />
-                <span className="text-white font-semibold">Campaign Admin</span>
+                <Settings className="h-6 w-6 text-violet-400" />
+                <span className="text-neutral-100 font-semibold">Campaign Admin</span>
               </div>
 
               {/* Wallet Connection */}
               {!user ? (
                 <button
                   onClick={handleConnect}
-                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+                  className="flex items-center space-x-2 bg-violet-600 hover:bg-violet-700 px-4 py-2 rounded-lg transition-colors"
                 >
                   <LogIn size={16} />
                   <span>Connect Wallet</span>
                 </button>
               ) : (
-                <div className="text-xs text-gray-300">
+                <div className="text-xs text-neutral-300">
                   Connected: {user.profile.stxAddress.testnet?.slice(0, 8)}...
                 </div>
               )}
@@ -403,49 +406,47 @@ export default function AdminPage() {
       <main className="container mx-auto px-6 py-12">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4">Campaign Dashboard</h1>
-          <p className="text-gray-300 mb-6">Manage your crowdfunding campaigns</p>
-          {loading && (
-            <div className="text-blue-400">Loading campaigns...</div>
-          )}
+          <h1 className="text-4xl font-bold text-neutral-100 mb-4">Campaign Dashboard</h1>
+          <p className="text-neutral-300 mb-6">Manage your crowdfunding campaigns</p>
+          {loading && <div className="text-violet-400">Loading campaigns...</div>}
         </div>
 
         {/* Global Stats */}
         <div className="grid md:grid-cols-4 gap-6 mb-12">
-          <div className="backdrop-blur-md bg-white/10 rounded-xl p-6 border border-white/20 text-center">
-            <Target className="h-8 w-8 text-blue-400 mx-auto mb-3" />
-            <div className="text-2xl font-bold text-white mb-1">{globalStats.totalRaised.toFixed(1)} STX</div>
-            <div className="text-gray-400 text-sm">Total Raised</div>
+          <div className="backdrop-blur-md bg-neutral-800/50 rounded-xl p-6 border border-neutral-700 text-center">
+            <Target className="h-8 w-8 text-violet-400 mx-auto mb-3" />
+            <div className="text-2xl font-bold text-neutral-100 mb-1">{globalStats.totalRaised.toFixed(1)} STX</div>
+            <div className="text-neutral-400 text-sm">Total Raised</div>
           </div>
 
-          <div className="backdrop-blur-md bg-white/10 rounded-xl p-6 border border-white/20 text-center">
-            <Users className="h-8 w-8 text-purple-400 mx-auto mb-3" />
-            <div className="text-2xl font-bold text-white mb-1">{globalStats.totalContributors}</div>
-            <div className="text-gray-400 text-sm">Contributors</div>
+          <div className="backdrop-blur-md bg-neutral-800/50 rounded-xl p-6 border border-neutral-700 text-center">
+            <Users className="h-8 w-8 text-indigo-400 mx-auto mb-3" />
+            <div className="text-2xl font-bold text-neutral-100 mb-1">{globalStats.totalContributors}</div>
+            <div className="text-neutral-400 text-sm">Contributors</div>
           </div>
 
-          <div className="backdrop-blur-md bg-white/10 rounded-xl p-6 border border-white/20 text-center">
-            <TrendingUp className="h-8 w-8 text-green-400 mx-auto mb-3" />
-            <div className="text-2xl font-bold text-white mb-1">{globalStats.activeCampaigns}</div>
-            <div className="text-gray-400 text-sm">Active Campaigns</div>
+          <div className="backdrop-blur-md bg-neutral-800/50 rounded-xl p-6 border border-neutral-700 text-center">
+            <TrendingUp className="h-8 w-8 text-indigo-400 mx-auto mb-3" />
+            <div className="text-2xl font-bold text-neutral-100 mb-1">{globalStats.activeCampaigns}</div>
+            <div className="text-neutral-400 text-sm">Active Campaigns</div>
           </div>
 
-          <div className="backdrop-blur-md bg-white/10 rounded-xl p-6 border border-white/20 text-center">
-            <BarChart3 className="h-8 w-8 text-yellow-400 mx-auto mb-3" />
-            <div className="text-2xl font-bold text-white mb-1">{globalStats.totalCampaigns}</div>
-            <div className="text-gray-400 text-sm">Total Campaigns</div>
+          <div className="backdrop-blur-md bg-neutral-800/50 rounded-xl p-6 border border-neutral-700 text-center">
+            <BarChart3 className="h-8 w-8 text-violet-400 mx-auto mb-3" />
+            <div className="text-2xl font-bold text-neutral-100 mb-1">{globalStats.totalCampaigns}</div>
+            <div className="text-neutral-400 text-sm">Total Campaigns</div>
           </div>
         </div>
 
         {!user && (
           <div className="text-center mb-8">
-            <div className="backdrop-blur-md bg-yellow-500/20 border border-yellow-400/30 rounded-xl p-6">
-              <AlertCircle className="h-12 w-12 text-yellow-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-white mb-2">Connect Wallet Required</h3>
-              <p className="text-gray-300 mb-4">Connect your wallet to manage your campaigns</p>
+            <div className="backdrop-blur-md bg-neutral-800/40 border border-neutral-700 rounded-xl p-8">
+              <AlertCircle className="h-12 w-12 text-violet-400 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-neutral-100 mb-2">Connect Wallet Required</h3>
+              <p className="text-neutral-300 mb-4">Connect your wallet to manage your campaigns</p>
               <button
                 onClick={handleConnect}
-                className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors"
+                className="bg-violet-600 hover:bg-violet-700 px-6 py-2 rounded-lg transition-colors"
               >
                 Connect Wallet
               </button>
@@ -457,12 +458,15 @@ export default function AdminPage() {
           <>
             {/* User's Campaigns */}
             <section className="mb-12">
-              <h2 className="text-3xl font-bold text-white mb-6">Your Campaigns ({userCampaigns.length})</h2>
+              <h2 className="text-3xl font-bold text-neutral-100 mb-6">Your Campaigns ({userActiveCampaigns.length})</h2>
 
               {userCampaigns.length === 0 ? (
-                <div className="backdrop-blur-md bg-white/5 rounded-xl p-8 text-center">
-                  <div className="text-gray-400 mb-4">You haven't created any campaigns yet</div>
-                  <Link href="/create" className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg transition-colors">
+                <div className="backdrop-blur-md bg-neutral-800/40 rounded-xl p-8 text-center border border-neutral-700">
+                  <div className="text-neutral-400 mb-4">You haven't created any campaigns yet</div>
+                  <Link
+                    href="/create"
+                    className="bg-violet-600 hover:bg-violet-700 px-6 py-2 rounded-lg transition-colors"
+                  >
                     Create Your First Campaign
                   </Link>
                 </div>
@@ -473,18 +477,24 @@ export default function AdminPage() {
                     const isClosing = closingCampaign === campaign.id
 
                     return (
-                      <div key={campaign.id} className="backdrop-blur-md bg-white/10 rounded-xl p-6 border border-white/20">
+                      <div
+                        key={campaign.id}
+                        className="backdrop-blur-md bg-neutral-800/50 rounded-xl p-6 border border-neutral-700"
+                      >
                         <div className="flex items-start justify-between mb-4">
                           <div>
-                            <h3 className="text-xl font-semibold text-white mb-2">{campaign.title}</h3>
-                            <p className="text-sm text-gray-300 mb-2">{campaign.description}</p>
-                            <p className="text-xs text-gray-400 mb-4">Owner: {campaign.owner}</p>
+                            <h3 className="text-xl font-semibold text-neutral-100 mb-2">{campaign.title}</h3>
+                            <p className="text-sm text-neutral-300 mb-2">{campaign.description}</p>
+                            <p className="text-xs text-neutral-400 mb-4">Owner: {campaign.owner}</p>
                             <div className="flex items-center space-x-2">
-                              <span className={`text-xs px-2 py-1 rounded ${campaign.active ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'
-                                }`}>
-                                {campaign.active ? 'Active' : 'Closed'}
+                              <span
+                                className={`text-xs px-2 py-1 rounded ${
+                                  campaign.active ? "bg-violet-600 text-neutral-100" : "bg-neutral-700 text-neutral-300"
+                                }`}
+                              >
+                                {campaign.active ? "Active" : "Closed"}
                               </span>
-                              <span className="text-xs text-gray-400">ID: {campaign.id}</span>
+                              <span className="text-xs text-neutral-400">ID: {campaign.id}</span>
                             </div>
                             {campaign.active && (
                               <div className="mt-2 text-xs text-gray-300">
@@ -527,11 +537,11 @@ export default function AdminPage() {
 
                         <div className="space-y-3">
                           <div className="flex justify-between text-sm">
-                            <span className="text-gray-400">Progress</span>
-                            <span className="text-white">{progress.toFixed(1)}%</span>
+                            <span className="text-neutral-400">Progress</span>
+                            <span className="text-neutral-100">{progress.toFixed(1)}%</span>
                           </div>
 
-                          <div className="w-full bg-gray-700 rounded-full h-3">
+                          <div className="w-full bg-neutral-800 rounded-full h-3">
                             <div
                               className={`h-3 rounded-full transition-all ${progress >= 100 ? 'bg-green-500' : 'bg-gradient-to-r from-blue-400 to-purple-400'
                                 }`}
@@ -539,13 +549,13 @@ export default function AdminPage() {
                             />
                           </div>
 
-                          <div className="flex justify-between text-sm text-gray-400">
+                          <div className="flex justify-between text-sm text-neutral-400">
                             <span>{campaign.total.toFixed(1)} STX raised</span>
                             <span>{campaign.goal.toFixed(1)} STX goal</span>
                           </div>
 
                           {progress >= 100 && (
-                            <div className="flex items-center space-x-2 text-green-400 text-sm">
+                            <div className="flex items-center space-x-2 text-violet-400 text-sm">
                               <CheckCircle size={16} />
                               <span>Goal Reached! 🎉</span>
                             </div>
@@ -607,15 +617,18 @@ export default function AdminPage() {
             {/* All Other Campaigns */}
             {otherCampaigns.length > 0 && (
               <section>
-                <h2 className="text-3xl font-bold text-white mb-6">Other Campaigns ({otherCampaigns.length})</h2>
+                <h2 className="text-3xl font-bold text-neutral-100 mb-6">Other Campaigns ({otherCampaigns.length})</h2>
                 <div className="grid md:grid-cols-3 gap-6">
                   {otherCampaigns.map((campaign) => {
                     const progress = campaign.goal > 0 ? (campaign.total / campaign.goal) * 100 : 0
 
                     return (
-                      <div key={campaign.id} className="backdrop-blur-md bg-white/5 rounded-xl p-4 border border-white/10">
-                        <h3 className="text-lg font-semibold text-white mb-2">{campaign.title}</h3>
-                        <p className="text-xs text-gray-400 mb-2">Owner: {campaign.owner.slice(0, 8)}...</p>
+                      <div
+                        key={campaign.id}
+                        className="backdrop-blur-md bg-neutral-800/40 rounded-xl p-4 border border-neutral-700"
+                      >
+                        <h3 className="text-lg font-semibold text-neutral-100 mb-2">{campaign.title}</h3>
+                        <p className="text-xs text-neutral-400 mb-2">Owner: {campaign.owner.slice(0, 8)}...</p>
 
                         <div className="space-y-2">
                           <div className="w-full bg-gray-700 rounded-full h-2">
@@ -626,10 +639,13 @@ export default function AdminPage() {
                           </div>
 
                           <div className="flex justify-between text-xs">
-                            <span className="text-gray-400">{campaign.total.toFixed(1)} STX</span>
-                            <span className={`px-2 py-1 rounded text-xs ${campaign.active ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'
-                              }`}>
-                              {campaign.active ? 'Active' : 'Closed'}
+                            <span className="text-neutral-400">{campaign.total.toFixed(1)} STX</span>
+                            <span
+                              className={`px-2 py-1 rounded text-xs ${
+                                campaign.active ? "bg-violet-600 text-neutral-100" : "bg-neutral-700 text-neutral-300"
+                              }`}
+                            >
+                              {campaign.active ? "Active" : "Closed"}
                             </span>
                           </div>
                           {campaign.active && (

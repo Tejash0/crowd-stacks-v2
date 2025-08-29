@@ -1,59 +1,63 @@
-# Stacks Crowdfunding DApp 🚀
+CrowdStacks – Decentralized Crowdfunding on Stacks
 
-A  decentralized crowdfunding platform built on Stacks blockchain.
+A milestone-based crowdfunding platform built on the Stacks blockchain. Campaign funds are escrowed in smart contracts and released only when goals are met, ensuring accountability for backers and creators.
 
-## 🚀 Quick Start
+Quick Start
+Prerequisites
 
-### Prerequisites
-- Node.js 18+
-- Docker Desktop
-- Clarinet CLI (`npm install -g @hirosystems/clarinet`)
+Node.js 18+
 
-### Installation
+Docker Desktop
 
-```bash
+Clarinet CLI (npm install -g @hirosystems/clarinet)
+
+Installation
 # Install dependencies
 npm install
 
-# Start Clarinet devnet
+# Start local Clarinet devnet
 cd contracts && clarinet integrate
 
-# Launch frontend (new terminal)
+# Launch frontend (in a new terminal)
 npm run dev
-```
 
-Visit `http://localhost:3000` to see your DApp!
 
-## 🧪 Testing
+Visit http://localhost:3000
+ to access the DApp.
 
-```bash
-# Run contract tests
+Testing
 npm test
 
-# Test in console
+# or directly in Clarinet console
 cd contracts && clarinet console
 (contract-call? .crowdfunding contribute u5000000)
-```
 
-## 📁 Project Structure
+Project Structure
 
-- `/contracts/` - Clarity smart contracts and tests
-- `/app/` - Next.js frontend application
-- `/components/` - Reusable UI components
-- `/public/` - Static assets
+/contracts/ – Clarity smart contracts and tests
 
-## 🎯 Demo Flow
+/app/ – Next.js frontend application
 
-1. Start local blockchain
-2. Launch frontend
-3. Contribute to campaign
-4. Watch confetti when goal reached!
-5. Withdraw or get refund
+/components/ – Reusable UI components
 
-## 📚 Documentation
+/lib/ – Blockchain helpers and config
 
-See `ABOUT.md` for detailed project information and technical architecture.
+/public/ – Static assets
 
----
+Demo Workflow
 
-Built for hackathons with ❤️
+Start local blockchain with Clarinet
+
+Launch frontend (npm run dev)
+
+Create a campaign
+
+Contribute STX to campaign
+
+Confetti triggers when goal is reached
+
+Withdraw funds (if successful) or request refund
+
+Documentation
+
+See ABOUT.md for technical architecture and implementation details.

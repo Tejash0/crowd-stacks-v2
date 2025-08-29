@@ -49,8 +49,6 @@ interface Campaign {
   successful?: boolean
   withdrawn?: boolean
   finalized?: boolean
-  blocksRemaining?: number
-  isPastDeadline?: boolean
 }
 
 interface GlobalStats {
@@ -82,51 +80,27 @@ const parseCampaign = (json: any, id: number): Campaign => {
   }
 }
 
-// Convert remaining to human-friendly time.
-// Handles both proper "blocks" values and legacy seconds-magnitude values.
-const formatBlocksToTime = (raw?: number) => {
-  if (raw === undefined || raw < 0) return ''
-  // Heuristic: if value is very large, it's likely seconds (legacy data)
-  // - Normal blocks per day ≈ 144; seconds per day = 86400
-  // Threshold 100k differentiates well between the two scales.
-  const totalMin = raw > 100_000 ? Math.floor(raw / 60) : raw * 10
-  const d = Math.floor(totalMin / 1440)
-  const h = Math.floor((totalMin % 1440) / 60)
-  const m = Math.floor(totalMin % 60)
-  const parts: string[] = []
-  if (d > 0) parts.push(`${d}d`)
-  if (h > 0 || d > 0) parts.push(`${h}h`)
-  parts.push(`${m}m`)
-  return parts.join(' ')
-}
-
-// Safely extract `blocks-remaining` from cvToJSON output of get-campaign-status
-const extractBlocksRemaining = (cvJson: any): number => {
+// Present a readable deadline from either unix-seconds or block height
+const formatDeadlineDisplay = (deadline: number, currentBlockHeight: number | null): string => {
+  if (!deadline || deadline <= 0) return 'No deadline'
+  const unixThreshold = 1_000_000_000
   try {
-    let node: any = cvJson
-    const unwrap = (n: any) => {
-      let cur = n
-      for (let i = 0; i < 6; i++) {
-        if (!cur) break
-        const t = String(cur.type || '').toLowerCase()
-        if (t.includes('response') || t === 'ok' || t === 'tuple') {
-          cur = cur.value
-          continue
-        }
-        break
-      }
-      return cur
+    if (deadline > unixThreshold) {
+      // Looks like Unix seconds
+      const dt = new Date(deadline * 1000)
+      return dt.toLocaleString()
     }
-    node = unwrap(node)
-
-    // Try both direct and nested value lookups
-    const container = (node && node.value) ? node.value : node
-    const brNode = container?.['blocks-remaining']
-    const raw = brNode && typeof brNode.value !== 'undefined' ? brNode.value : brNode
-    const n = Number(raw)
-    return Number.isFinite(n) ? n : 0
+    // Looks like a block height value
+    if (currentBlockHeight && deadline >= currentBlockHeight) {
+      const blocksRemaining = deadline - currentBlockHeight
+      const estMs = blocksRemaining * 10 * 60 * 1000 // ~10 min per block
+      const est = new Date(Date.now() + estMs)
+      return `${est.toLocaleString()} (est, block ${deadline})`
+    }
+    // Fallback: show the block number when we cannot estimate a wall time
+    return `Block #${deadline}`
   } catch {
-    return 0
+    return `Block #${deadline}`
   }
 }
 
@@ -141,6 +115,7 @@ export default function AdminPage() {
   })
   const [loading, setLoading] = useState(true)
   const [closingCampaign, setClosingCampaign] = useState<number | null>(null)
+  const [currentBlockHeight, setCurrentBlockHeight] = useState<number | null>(null)
 
   // Check wallet connection on load
   useEffect(() => {
@@ -154,6 +129,21 @@ export default function AdminPage() {
   useEffect(() => {
     const interval = setInterval(fetchAllData, 30000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Fetch current chain height (client-side) to estimate block-based deadlines
+  useEffect(() => {
+    const fetchTip = async () => {
+      try {
+        const res = await fetch('https://api.testnet.hiro.so/v2/info')
+        const info = await res.json()
+        if (info?.stacks_tip_height) setCurrentBlockHeight(Number(info.stacks_tip_height))
+      } catch (e) {
+        // Non-fatal; we will show the block number instead
+        console.warn('Failed to fetch tip height', e)
+      }
+    }
+    fetchTip()
   }, [])
 
   // Connect wallet
@@ -250,50 +240,7 @@ export default function AdminPage() {
         })
         .filter((campaign): campaign is Campaign => campaign !== null)
 
-      // Enrich campaigns with live status (blocks-remaining)
-      const statusPromises = fetchedCampaigns.map((c) =>
-        callReadOnlyFunction({
-          contractAddress: CONTRACT_ADDRESS,
-          contractName: CONTRACT_NAME,
-          functionName: 'get-campaign-status',
-          functionArgs: [uintCV(c.id)],
-          network,
-          senderAddress: CONTRACT_ADDRESS,
-        })
-      )
-      const statusResults = await Promise.all(statusPromises)
-      const campaignsWithStatus = fetchedCampaigns.map((c, i) => {
-        try {
-          const json: any = cvToJSON(statusResults[i])
-          // Unwrap structure for multiple possible shapes
-          const unwrap = (n: any) => {
-            let cur = n
-            for (let k = 0; k < 6; k++) {
-              if (!cur) break
-              const t = String(cur.type || '').toLowerCase()
-              if (t.includes('response') || t === 'ok' || t === 'tuple') {
-                cur = cur.value
-                continue
-              }
-              break
-            }
-            return cur
-          }
-          const tuple = unwrap(json)
-          const blocks = extractBlocksRemaining(json)
-          const isPast = (() => {
-            const node = (tuple && tuple.value) ? tuple.value : tuple
-            const v = node?.['is-past-deadline']
-            const raw = v && typeof v.value !== 'undefined' ? v.value : v
-            return Boolean(raw)
-          })()
-          return { ...c, blocksRemaining: blocks, isPastDeadline: isPast }
-        } catch (e) {
-          return { ...c }
-        }
-      })
-
-      setCampaigns(campaignsWithStatus)
+      setCampaigns(fetchedCampaigns)
 
     } catch (error) {
       console.error('Error fetching blockchain data:', error)
@@ -532,25 +479,18 @@ export default function AdminPage() {
                             <h3 className="text-xl font-semibold text-white mb-2">{campaign.title}</h3>
                             <p className="text-sm text-gray-300 mb-2">{campaign.description}</p>
                             <p className="text-xs text-gray-400 mb-4">Owner: {campaign.owner}</p>
-                          <div className="flex items-center space-x-2">
-                            <span className={`text-xs px-2 py-1 rounded ${campaign.active ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'
-                              }`}>
-                              {campaign.active ? 'Active' : 'Closed'}
-                            </span>
-                            <span className="text-xs text-gray-400">ID: {campaign.id}</span>
-                          </div>
-                          {campaign.active && (
-                            <div className="flex items-center space-x-2 mt-2 text-xs text-gray-300">
-                              <Calendar size={14} />
-                              <span>
-                                {campaign.isPastDeadline
-                                  ? 'Deadline passed'
-                                  : (campaign.blocksRemaining ?? 0) > 0
-                                    ? `${formatBlocksToTime(campaign.blocksRemaining)} left`
-                                    : 'Ending soon'}
+                            <div className="flex items-center space-x-2">
+                              <span className={`text-xs px-2 py-1 rounded ${campaign.active ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'
+                                }`}>
+                                {campaign.active ? 'Active' : 'Closed'}
                               </span>
+                              <span className="text-xs text-gray-400">ID: {campaign.id}</span>
                             </div>
-                          )}
+                            {campaign.active && (
+                              <div className="mt-2 text-xs text-gray-300">
+                                <span className="opacity-80">Deadline:</span> {formatDeadlineDisplay(campaign.deadline, currentBlockHeight)}
+                              </div>
+                            )}
                           </div>
 
                           {campaign.active && (
@@ -693,15 +633,8 @@ export default function AdminPage() {
                             </span>
                           </div>
                           {campaign.active && (
-                            <div className="flex items-center space-x-2 text-xs text-gray-300 mt-1">
-                              <Calendar size={12} />
-                              <span>
-                                {campaign.isPastDeadline
-                                  ? 'Deadline passed'
-                                  : (campaign.blocksRemaining ?? 0) > 0
-                                    ? `${formatBlocksToTime(campaign.blocksRemaining)} left`
-                                    : 'Ending soon'}
-                              </span>
+                            <div className="text-xs text-gray-300">
+                              <span className="opacity-80">Deadline:</span> {formatDeadlineDisplay(campaign.deadline, currentBlockHeight)}
                             </div>
                           )}
                         </div>

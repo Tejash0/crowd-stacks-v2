@@ -108,14 +108,14 @@ export default function CreatePage() {
       const info = await response.json();
       const currentBlockHeight = info.stacks_tip_height;
 
-      // Convert deadline to block height (approximate)
+      // Convert deadline to block height (approximate) 
+      // Use current block height, not unix seconds; ~1 block per 10 minutes (~144/day)
       let deadlineBlock = 999999999 // Default very high block if no deadline
       if (formData.deadline) {
         const deadlineDate = new Date(formData.deadline)
-        const now = new Date()
-        const daysUntilDeadline = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        // Approximate: 144 blocks per day
-        deadlineBlock = Math.floor(Date.now() / 1000) + (daysUntilDeadline * 144)
+        const msUntil = Math.max(0, deadlineDate.getTime() - Date.now())
+        const blocksFromNow = Math.max(1, Math.ceil(msUntil / (10 * 60 * 1000)))
+        deadlineBlock = currentBlockHeight + blocksFromNow
       }
 
       // Call the create-campaign contract function

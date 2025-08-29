@@ -12,6 +12,7 @@ import {
   TrendingUp,
   BarChart3,
   X,
+  RefreshCcw,
   CheckCircle,
   AlertCircle,
   LogIn
@@ -48,6 +49,8 @@ interface Campaign {
   successful?: boolean
   withdrawn?: boolean
   finalized?: boolean
+  blocksRemaining?: number
+  isPastDeadline?: boolean
 }
 
 interface GlobalStats {
@@ -76,6 +79,54 @@ const parseCampaign = (json: any, id: number): Campaign => {
     successful: jBool(d.successful),
     withdrawn: jBool(d.withdrawn),
     finalized: jBool(d.finalized),
+  }
+}
+
+// Convert remaining to human-friendly time.
+// Handles both proper "blocks" values and legacy seconds-magnitude values.
+const formatBlocksToTime = (raw?: number) => {
+  if (raw === undefined || raw < 0) return ''
+  // Heuristic: if value is very large, it's likely seconds (legacy data)
+  // - Normal blocks per day ≈ 144; seconds per day = 86400
+  // Threshold 100k differentiates well between the two scales.
+  const totalMin = raw > 100_000 ? Math.floor(raw / 60) : raw * 10
+  const d = Math.floor(totalMin / 1440)
+  const h = Math.floor((totalMin % 1440) / 60)
+  const m = Math.floor(totalMin % 60)
+  const parts: string[] = []
+  if (d > 0) parts.push(`${d}d`)
+  if (h > 0 || d > 0) parts.push(`${h}h`)
+  parts.push(`${m}m`)
+  return parts.join(' ')
+}
+
+// Safely extract `blocks-remaining` from cvToJSON output of get-campaign-status
+const extractBlocksRemaining = (cvJson: any): number => {
+  try {
+    let node: any = cvJson
+    const unwrap = (n: any) => {
+      let cur = n
+      for (let i = 0; i < 6; i++) {
+        if (!cur) break
+        const t = String(cur.type || '').toLowerCase()
+        if (t.includes('response') || t === 'ok' || t === 'tuple') {
+          cur = cur.value
+          continue
+        }
+        break
+      }
+      return cur
+    }
+    node = unwrap(node)
+
+    // Try both direct and nested value lookups
+    const container = (node && node.value) ? node.value : node
+    const brNode = container?.['blocks-remaining']
+    const raw = brNode && typeof brNode.value !== 'undefined' ? brNode.value : brNode
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : 0
+  } catch {
+    return 0
   }
 }
 
@@ -199,7 +250,50 @@ export default function AdminPage() {
         })
         .filter((campaign): campaign is Campaign => campaign !== null)
 
-      setCampaigns(fetchedCampaigns)
+      // Enrich campaigns with live status (blocks-remaining)
+      const statusPromises = fetchedCampaigns.map((c) =>
+        callReadOnlyFunction({
+          contractAddress: CONTRACT_ADDRESS,
+          contractName: CONTRACT_NAME,
+          functionName: 'get-campaign-status',
+          functionArgs: [uintCV(c.id)],
+          network,
+          senderAddress: CONTRACT_ADDRESS,
+        })
+      )
+      const statusResults = await Promise.all(statusPromises)
+      const campaignsWithStatus = fetchedCampaigns.map((c, i) => {
+        try {
+          const json: any = cvToJSON(statusResults[i])
+          // Unwrap structure for multiple possible shapes
+          const unwrap = (n: any) => {
+            let cur = n
+            for (let k = 0; k < 6; k++) {
+              if (!cur) break
+              const t = String(cur.type || '').toLowerCase()
+              if (t.includes('response') || t === 'ok' || t === 'tuple') {
+                cur = cur.value
+                continue
+              }
+              break
+            }
+            return cur
+          }
+          const tuple = unwrap(json)
+          const blocks = extractBlocksRemaining(json)
+          const isPast = (() => {
+            const node = (tuple && tuple.value) ? tuple.value : tuple
+            const v = node?.['is-past-deadline']
+            const raw = v && typeof v.value !== 'undefined' ? v.value : v
+            return Boolean(raw)
+          })()
+          return { ...c, blocksRemaining: blocks, isPastDeadline: isPast }
+        } catch (e) {
+          return { ...c }
+        }
+      })
+
+      setCampaigns(campaignsWithStatus)
 
     } catch (error) {
       console.error('Error fetching blockchain data:', error)
@@ -320,6 +414,8 @@ export default function AdminPage() {
 
   // Get user's campaigns
   const userCampaigns = user ? campaigns.filter(c => c.owner === user.profile.stxAddress.testnet) : []
+  const userActiveCampaigns = userCampaigns.filter(c => c.active)
+  const userClosedCampaigns = userCampaigns.filter(c => !c.active)
   const otherCampaigns = user ? campaigns.filter(c => c.owner !== user.profile.stxAddress.testnet) : []
 
   return (
@@ -425,7 +521,7 @@ export default function AdminPage() {
                 </div>
               ) : (
                 <div className="grid md:grid-cols-2 gap-6">
-                  {userCampaigns.map((campaign) => {
+                  {userActiveCampaigns.map((campaign) => {
                     const progress = campaign.goal > 0 ? (campaign.total / campaign.goal) * 100 : 0
                     const isClosing = closingCampaign === campaign.id
 
@@ -436,13 +532,25 @@ export default function AdminPage() {
                             <h3 className="text-xl font-semibold text-white mb-2">{campaign.title}</h3>
                             <p className="text-sm text-gray-300 mb-2">{campaign.description}</p>
                             <p className="text-xs text-gray-400 mb-4">Owner: {campaign.owner}</p>
-                            <div className="flex items-center space-x-2">
-                              <span className={`text-xs px-2 py-1 rounded ${campaign.active ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'
-                                }`}>
-                                {campaign.active ? 'Active' : 'Closed'}
+                          <div className="flex items-center space-x-2">
+                            <span className={`text-xs px-2 py-1 rounded ${campaign.active ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'
+                              }`}>
+                              {campaign.active ? 'Active' : 'Closed'}
+                            </span>
+                            <span className="text-xs text-gray-400">ID: {campaign.id}</span>
+                          </div>
+                          {campaign.active && (
+                            <div className="flex items-center space-x-2 mt-2 text-xs text-gray-300">
+                              <Calendar size={14} />
+                              <span>
+                                {campaign.isPastDeadline
+                                  ? 'Deadline passed'
+                                  : (campaign.blocksRemaining ?? 0) > 0
+                                    ? `${formatBlocksToTime(campaign.blocksRemaining)} left`
+                                    : 'Ending soon'}
                               </span>
-                              <span className="text-xs text-gray-400">ID: {campaign.id}</span>
                             </div>
+                          )}
                           </div>
 
                           {campaign.active && (
@@ -459,10 +567,19 @@ export default function AdminPage() {
                               <button
                                 onClick={() => handleCloseCampaign(campaign.id)}
                                 disabled={isClosing}
-                                className="flex items-center space-x-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 px-3 py-2 rounded-lg text-sm transition-colors"
+                                className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm transition-colors disabled:bg-gray-600 
+                                  ${campaign.total > 0 ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-red-600 hover:bg-red-700'}`}
                               >
-                                <X size={14} />
-                                <span>{isClosing ? 'Closing...' : 'Close'}</span>
+                                {campaign.total > 0 ? (
+                                  <RefreshCcw size={14} />
+                                ) : (
+                                  <X size={14} />
+                                )}
+                                <span>
+                                  {isClosing
+                                    ? (campaign.total > 0 ? 'Processing...' : 'Closing...')
+                                    : (campaign.total > 0 ? 'Refund' : 'Close')}
+                                </span>
                               </button>
                             )
                           )}
@@ -499,6 +616,52 @@ export default function AdminPage() {
                   })}
                 </div>
               )}
+
+              {userClosedCampaigns.length > 0 && (
+                <>
+                  <h3 className="text-xl font-semibold text-white mt-8 mb-3">Closed Campaigns ({userClosedCampaigns.length})</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {userClosedCampaigns.map((campaign) => {
+                      const progress = campaign.goal > 0 ? (campaign.total / campaign.goal) * 100 : 0
+
+                      return (
+                        <div key={campaign.id} className="backdrop-blur-md bg-white/10 rounded-xl p-6 border border-white/20">
+                          <div className="flex items-start justify-between mb-4">
+                            <div>
+                              <h3 className="text-xl font-semibold text-white mb-2">{campaign.title}</h3>
+                              <p className="text-sm text-gray-300 mb-2">{campaign.description}</p>
+                              <p className="text-xs text-gray-400 mb-4">Owner: {campaign.owner}</p>
+                              <div className="flex items-center space-x-2">
+                                <span className="text-xs px-2 py-1 rounded bg-gray-600 text-gray-300">Closed</span>
+                                <span className="text-xs text-gray-400">ID: {campaign.id}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-400">Progress</span>
+                              <span className="text-white">{progress.toFixed(1)}%</span>
+                            </div>
+
+                            <div className="w-full bg-gray-700 rounded-full h-3">
+                              <div
+                                className={`h-3 rounded-full transition-all ${progress >= 100 ? 'bg-green-500' : 'bg-gradient-to-r from-blue-400 to-purple-400'}`}
+                                style={{ width: `${Math.min(progress, 100)}%` }}
+                              />
+                            </div>
+
+                            <div className="flex justify-between text-sm text-gray-400">
+                              <span>{campaign.total.toFixed(1)} STX raised</span>
+                              <span>{campaign.goal.toFixed(1)} STX goal</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
             </section>
 
             {/* All Other Campaigns */}
@@ -529,6 +692,18 @@ export default function AdminPage() {
                               {campaign.active ? 'Active' : 'Closed'}
                             </span>
                           </div>
+                          {campaign.active && (
+                            <div className="flex items-center space-x-2 text-xs text-gray-300 mt-1">
+                              <Calendar size={12} />
+                              <span>
+                                {campaign.isPastDeadline
+                                  ? 'Deadline passed'
+                                  : (campaign.blocksRemaining ?? 0) > 0
+                                    ? `${formatBlocksToTime(campaign.blocksRemaining)} left`
+                                    : 'Ending soon'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )

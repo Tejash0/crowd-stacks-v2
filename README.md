@@ -81,6 +81,9 @@ cd contracts && clarinet console
 5. Wait for the milestone goal to be met.
 6. Withdraw funds (if successful) or request a refund.
 
+##SnapShots
+E:\crowd-stacks-v2\image.png
+
 ## **Documentation**
 
 For technical architecture and implementation details, see **ABOUT.md**.
